@@ -10,26 +10,27 @@ import com.crediya.model.exceptions.DomainException;
 import com.crediya.model.exceptions.LoanTypeNotFoundException;
 import com.crediya.model.loan.Loan;
 import com.crediya.usecase.loan.LoanUseCase;
-import com.crediya.usecase.loantype.LoanTypeUseCase;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.boot.actuate.endpoint.annotation.WriteOperation;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 
+
+
+
 @Component
 public class Handler {
 
     private final LoanUseCase loanUseCase;
-    private final LoanTypeUseCase loanTypeUseCase;
     private final LoanDTOMapper loanMapper;
     private final UserClient userClient;
 
     public Handler(LoanUseCase loanUseCase,
-                   LoanTypeUseCase loanTypeUseCase,
                    LoanDTOMapper loanMapper,
                    UserClient userClient) {
         this.loanUseCase = loanUseCase;
-        this.loanTypeUseCase = loanTypeUseCase;
         this.loanMapper = loanMapper;
         this.userClient = userClient;
     }
@@ -39,7 +40,7 @@ public class Handler {
         return request.bodyToMono(CreateLoanDTO.class)
                 .flatMap(dto ->
                         Mono.zip(
-                                loanTypeUseCase.findById(dto.loanTypeId())
+                                loanUseCase.findById(dto.loanTypeId())
                                         .switchIfEmpty(Mono.error(new LoanTypeNotFoundException(dto.loanTypeId()))),
                                 userClient.existsByDni(dto.dniClient())
                                         .flatMap(exists -> exists ?
@@ -49,7 +50,7 @@ public class Handler {
                         )
                 )
                 .flatMap(tuple -> {
-                    var loanType = tuple.getT1();
+                    var loanType = tuple.getT1(); //no necesario
                     var exists = tuple.getT2();
                     var dto = tuple.getT3();
 
@@ -74,20 +75,4 @@ public class Handler {
     }
 
 
-    // Editar préstamo
-    public Mono<ServerResponse> editLoan(ServerRequest request) {
-        Long id = Long.valueOf(request.pathVariable("id"));
-        return request.bodyToMono(EditLoanDTO.class)
-                .flatMap(dto ->
-                        loanTypeUseCase.findById(dto.loanTypeId())
-                                .switchIfEmpty(Mono.error(new RuntimeException("Tipo de préstamo no existe")))
-                                .flatMap(type -> {
-                                    Loan loan = loanMapper.toModel(dto);
-                                    loan.setId(id); // importante asignar el id para la actualización
-                                    return loanUseCase.updateLoan(loan);
-                                })
-                )
-                .flatMap(loan -> ServerResponse.ok().bodyValue(loan))
-                .onErrorResume(e -> ServerResponse.badRequest().bodyValue(e.getMessage()));
-    }
 }

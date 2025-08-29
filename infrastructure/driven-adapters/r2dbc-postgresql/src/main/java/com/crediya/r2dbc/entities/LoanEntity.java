@@ -27,7 +27,7 @@ public class LoanEntity {
     private String status;
 
     public StatusEnum getStatusAsEnum() {
-        return StatusEnum.fromString(this.status);
+        return StatusEnum.fromString(this.status).block();
     }
 
     public void setStatusFromEnum(StatusEnum status) {
